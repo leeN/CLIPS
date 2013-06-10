@@ -24,7 +24,7 @@
 #include	<descrip.h>
 #include	<iodef.h>
 #include	<ttdef.h>
-#include        <tt2def.h>
+#include    <tt2def.h>
 
 #define NIBUF	128	    /* Input buffer size		*/
 #define NOBUF	1024	/* MM says big buffers win!	*/
@@ -46,11 +46,18 @@ static short	iochan;		 	/* TTY I/O channel		*/
 #include	<dos.h>
 #endif
 
-#if     UNIX_7 || UNIX_V || LINUX || DARWIN
+#if     UNIX_7 || UNIX_V || DARWIN
 #include <sys/ioctl.h>
 #include	<sgtty.h>		/* for stty/gtty functions */
 static struct  sgttyb  ostate;		        /* saved tty state */
 static struct  sgttyb  nstate;		        /* values for editor mode */
+#endif
+
+#if	LINUX
+#include <termios.h>
+#include <unistd.h>
+static struct termios ostate;			/* saved tty state */
+static struct termios nstate;			/* values for editor mode */
 #endif
 
 /* =======================================================================
@@ -1545,7 +1552,7 @@ globle void ttopen()
 		exit(status);
 #endif
 
-#if	UNIX_7 || UNIX_V || LINUX || DARWIN
+#if	UNIX_7 || UNIX_V || DARWIN
         ioctl(1,TIOCGETP,&ostate);
         ioctl(1,TIOCGETP,&nstate);
 	/* gtty(1, &ostate);	*/		/* save old state */
@@ -1555,6 +1562,14 @@ globle void ttopen()
 	/* stty(1, &nstate);	*/		/* set mode */
         ioctl(1,TIOCSETP,&nstate);
 #endif
+
+#if	LINUX
+	tcgetattr(1, &ostate);              /* save old state */
+	tcgetattr(1, &nstate);	            /* get base of new state */
+	cfmakeraw( &nstate );			    /* set raw mode (echo disabled) */
+	tcsetattr(1, TCSANOW, &nstate);		/* set the new mode */
+#endif
+
 }
 
 /*
@@ -1577,10 +1592,14 @@ globle void ttclose()
 		exit(status);
 #endif
 
-#if	UNIX_7 || UNIX_V || LINUX || DARWIN
+#if	UNIX_7 || UNIX_V || DARWIN
 	/* stty(1, &ostate); */
         ioctl(1,TIOCSETP,&ostate);
 #endif
+#if	LINUX
+	tcsetattr(1, TCSANOW, &ostate);		/* set the old mode */
+#endif
+
 }
 
 /*
